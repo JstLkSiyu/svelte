@@ -3,7 +3,7 @@ import fragment from './state/fragment';
 import { regex_whitespace } from '../utils/patterns';
 import { reserved } from '../utils/names';
 import full_char_code_at from '../utils/full_char_code_at';
-import { TemplateNode, Ast, ParserOptions, Fragment, Style, Script } from '../interfaces';
+import { TemplateNode, Ast, ParserOptions, Fragment, Style, Script, VisualSchema, VisualNode } from '../interfaces';
 import error from '../utils/error';
 import parser_errors from './errors';
 
@@ -244,4 +244,36 @@ export default function parse(
 		instance: instance_scripts[0],
 		module: module_scripts[0]
 	};
+}
+
+class VisualSchemaParser {
+	constructor(schema: VisualSchema) {
+		const {
+			root,
+			css,
+			js,
+			props = [],
+			states = [],
+		} = schema;
+		this.parseNode(root);
+	}
+	parseNode(node: VisualNode) {
+		//
+	}
+	parseLogicNode() {
+		//
+	}
+	parseElementNode() {
+		//
+	}
+}
+
+export function parseVisualSchema(schema: VisualSchema, options: ParserOptions = {}): Ast {
+	const parser = new VisualSchemaParser(schema);
+	return {
+		html: null,
+		css: null,
+		instance: null,
+		module: null,
+	}
 }

@@ -1,8 +1,8 @@
 import Stats from '../Stats';
-import parse from '../parse/index';
+import parse, { parseVisualSchema } from '../parse/index';
 import render_dom from './render_dom/index';
 import render_ssr from './render_ssr/index';
-import { CompileOptions, Warning } from '../interfaces';
+import { CompileOptions, VisualSchema, Warning } from '../interfaces';
 import Component from './Component';
 import fuzzymatch from '../utils/fuzzymatch';
 import get_name_from_filename from './utils/get_name_from_filename';
@@ -126,6 +126,38 @@ export default function compile(source: string, options: CompileOptions = {}) {
 	const component = new Component(
 		ast,
 		source,
+		options.name || get_name_from_filename(options.filename) || 'Component',
+		options,
+		stats,
+		warnings
+	);
+	stats.stop('create component');
+
+	const result = options.generate === false
+		? null
+		: options.generate === 'ssr'
+			? render_ssr(component, options)
+			: render_dom(component, options);
+
+	return component.generate(result);
+}
+
+export function compileVisualSchema(schema: VisualSchema, options: CompileOptions) {
+	options = Object.assign({ generate: 'dom', dev: false, enableSourcemap: true, css: 'injected' }, options);
+
+	const stats = new Stats();
+	const warnings = [];
+
+	validate_options(options, warnings);
+
+	stats.start('parse');
+	const ast = parseVisualSchema(schema, options);
+	stats.stop('parse');
+
+	stats.start('create component');
+	const component = new Component(
+		ast,
+		String(),
 		options.name || get_name_from_filename(options.filename) || 'Component',
 		options,
 		stats,

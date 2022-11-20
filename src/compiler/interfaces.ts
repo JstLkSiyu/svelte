@@ -229,3 +229,20 @@ export interface CssResult {
 	code: string;
 	map: SourceMap;
 }
+
+enum VisualNodeType {
+
+}
+
+export interface VisualNode {
+	type: string;
+	children?: Array<VisualNode>;
+}
+
+export interface VisualSchema {
+	css?: string;
+	js?: string;
+	props?: string[];
+	states?: string[];
+	root?: VisualNode;
+}
