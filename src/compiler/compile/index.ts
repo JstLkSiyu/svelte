@@ -150,6 +150,9 @@ export function compileVisualSchema(schema: VisualSchema, options: CompileOption
 
 	validate_options(options, warnings);
 
+	const { tag } = options;
+	Object.assign(schema, { tag });
+
 	stats.start('parse');
 	const ast = parseVisualSchema(schema, options);
 	stats.stop('parse');
