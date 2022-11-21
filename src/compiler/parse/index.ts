@@ -3,7 +3,7 @@ import fragment from './state/fragment';
 import { regex_whitespace } from '../utils/patterns';
 import { reserved } from '../utils/names';
 import full_char_code_at from '../utils/full_char_code_at';
-import { TemplateNode, Ast, ParserOptions, Fragment, Style, Script, VisualSchema, VisualNode, VisualNodeAttr, VisualNodeIntl, VisualElementNode, VisualExprNode, VisualTextNode } from '../interfaces';
+import { TemplateNode, Ast, ParserOptions, Fragment, Style, Script, VisualSchema, VisualNodeAttr, VisualNodeIntl, VisualElementNode, VisualExprNode, VisualTextNode } from '../interfaces';
 import error from '../utils/error';
 import parser_errors from './errors';
 import { Program } from 'estree';
