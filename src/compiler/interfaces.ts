@@ -230,14 +230,50 @@ export interface CssResult {
 	map: SourceMap;
 }
 
-enum VisualNodeType {
-
-}
-
-export interface VisualNode {
+export interface VisualNodeIntl {
 	type: string;
-	children?: Array<VisualNode>;
+	children?: Array<VisualNodeIntl>;
 }
+
+export interface VisualNodeAttr {
+	type: 'EventHandler' | 'Attribute';
+	name: string;
+	value: string[];
+}
+
+export interface VisualElementNode extends VisualNodeIntl {
+	type: 'element';
+	tagName: string;
+	attributes: VisualNodeAttr[];
+}
+
+export interface VisualLogicNode extends VisualNodeIntl {
+	type: 'logic';
+	logicType: 'if' | 'each';
+	expr: string;
+}
+
+export interface VisualOptionsNode extends VisualNodeIntl {
+	type: 'options';
+}
+
+export interface VisualTextNode extends VisualNodeIntl {
+	type: 'text';
+	text: string;
+}
+
+export interface VisualExprNode extends VisualNodeIntl {
+	type: 'expr';
+	expression: string;
+}
+
+export type VisualNode = (
+	VisualElementNode |
+	VisualLogicNode |
+	VisualOptionsNode |
+	VisualTextNode |
+	VisualExprNode
+);
 
 export interface VisualSchema {
 	css?: string;

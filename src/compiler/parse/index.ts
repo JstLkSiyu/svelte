@@ -1,11 +1,16 @@
-import { isIdentifierStart, isIdentifierChar } from 'acorn';
+import { isIdentifierStart, isIdentifierChar, parse as acornParse } from 'acorn';
 import fragment from './state/fragment';
 import { regex_whitespace } from '../utils/patterns';
 import { reserved } from '../utils/names';
 import full_char_code_at from '../utils/full_char_code_at';
-import { TemplateNode, Ast, ParserOptions, Fragment, Style, Script, VisualSchema, VisualNode } from '../interfaces';
+import { TemplateNode, Ast, ParserOptions, Fragment, Style, Script, VisualSchema, VisualNode, VisualNodeAttr, VisualNodeIntl, VisualElementNode, VisualExprNode, VisualTextNode } from '../interfaces';
 import error from '../utils/error';
 import parser_errors from './errors';
+import { Program } from 'estree';
+import { parseExpressionAt } from 'code-red';
+// @ts-ignore
+import parseCss from 'css-tree/parser';
+import { walk } from 'estree-walker';
 
 type ParserState = (parser: Parser) => (ParserState | void);
 
@@ -247,33 +252,206 @@ export default function parse(
 }
 
 class VisualSchemaParser {
-	constructor(schema: VisualSchema) {
+	getHtml = () => null;
+	getCss = () => null;
+	getInstance = () => null;
+	getModule = () => null;
+	constructor(schema: VisualSchema, customTag = 'div') {
 		const {
 			root,
-			css,
-			js,
-			props = [],
-			states = [],
+			css = String(),
+			js = String(),
+			// props = [],
+			// states = [],
 		} = schema;
-		this.parseNode(root);
+		const rootAst = this.parseNode(root);
+		const tagOptions = this.parseSvelteOptions([{
+			type: 'Attribute',
+			name: 'tag',
+			value: [customTag],
+		}]);
+		const htmlContent = [tagOptions, rootAst];
+		const htmlFragment = this.createFragment(htmlContent);
+		this.getHtml = () => htmlFragment;
+		this.getCss = () => this.parseCss(css);
+		this.getInstance = () => this.parseJs(js, 'module');
 	}
-	parseNode(node: VisualNode) {
-		//
+	parseSvelteOptions(attributes: VisualNodeAttr[]) {
+		const ast = {
+			type: 'Options',
+			name: 'svelte:options',
+			attributes: attributes.map(attr => this.parseAttribute(attr)),
+			children: [],
+			...this.createLocation(),
+		};
+		return ast;
+	}
+	parseText(raw: string, data?: string) {
+		const ast = {
+			type: 'Text',
+			raw,
+			data: data ?? raw,
+			...this.createLocation(),
+		};
+		return ast;
+	}
+	parseAttribute(attribute: VisualNodeAttr) {
+		const { type, name, value } = attribute;
+		const ast = {
+			type,
+			name,
+			value: value.map(val => this.parseText(val)),
+			...this.createLocation(),
+		};
+		return ast;
+	}
+	parseNode(node: VisualNodeIntl) {
+		if (this.isElementNode(node)) {
+			return this.parseElementNode(node.tagName, node.attributes, node.children);
+		} else if (this.isExprNode(node)) {
+			return this.parseExpr(node.expression, true);
+		} else if (this.isTextNode(node)) {
+			return this.parseText(node.text);
+		} else {
+			return null;
+		}
 	}
 	parseLogicNode() {
 		//
 	}
-	parseElementNode() {
-		//
+	parseEventHandler(event: string, handleExpr: string) {
+		const ast = {
+			type: 'EventHandler',
+			name: event,
+			modifiers: [],
+			expression: this.parseExpr(handleExpr),
+			...this.createLocation(),
+		};
+		return ast;
+	}
+	isElementNode(node: VisualNodeIntl): node is VisualElementNode {
+		return node.type === 'element';
+	}
+	isExprNode(node: VisualNodeIntl): node is VisualExprNode {
+		return node.type === 'expr';
+	}
+	isTextNode(node: VisualNodeIntl): node is VisualTextNode {
+		return node.type === 'text';
+	}
+	parseElementNode(tagName: string, attributes: VisualNodeAttr[], children: VisualNodeIntl[]) {
+		const ast = {
+			type: 'Element',
+			name: tagName,
+			attributes: attributes.reduce((attrs, attr) => {
+				switch (attr.type) {
+					case 'EventHandler': {
+						attrs.push(
+							this.parseEventHandler(attr.name, attr.value[0])
+						);
+						break;
+					}
+					default: {}
+				}
+				return attrs;
+			}, []),
+			children: children.reduce((children, child) => {
+				const childAst = this.parseNode(child);
+				if (childAst) {
+					children.push(childAst);
+				}
+				return children;
+			}, []),
+			...this.createLocation(),
+		};
+		return ast;
+	}
+	createFragment(children: any) {
+		const ast = {
+			type: 'Fragment',
+			children,
+			...this.createLocation()
+		};
+		return ast;
+	}
+	createLocation(withLocation = false, startAndEnd?: { start: number, end: number }) {
+		const { start, end } = startAndEnd ?? { start: 0, end: 0 };
+		const location = { start, end };
+		const emptyLoc = { line:0, column: 0 };
+		if (withLocation) {
+			Object.assign(location, {
+				loc: {
+					start: emptyLoc,
+					end: emptyLoc
+				}
+			});
+		}
+		return location;
+	}
+	parseJs(js: string, context: string) {
+		const ast = {
+			type: 'Script' as const,
+			context,
+			content: acornParse(js, {
+				sourceType: 'module',
+				ecmaVersion: 12,
+			}) as any as Program,
+			...this.createLocation()
+		};
+		return ast;
+	}
+	parseExpr(expr: string, wrapMustache = false) {
+		const exprBlock = parseExpressionAt(expr, 0, {
+			sourceType: 'module',
+			ecmaVersion: 12,
+		});
+		let ast = exprBlock;
+		if (wrapMustache) {
+			ast = {
+				type: 'MustacheTag',
+				expression: exprBlock,
+				...this.createLocation()
+			};
+		}
+		return ast;
+	}
+	parseCss(css: string) {
+		css = css.trim();
+		let cssAst = parseCss(css, {
+			positions: true,
+			offset: 0,
+		});
+		cssAst = JSON.parse(JSON.stringify(cssAst));
+		walk(cssAst, {
+			enter(node: any) {
+				if (node.loc) {
+					node.start = node.loc.start.offset;
+					node.end = node.loc.end.offset;
+					delete node.loc;
+				}
+			}
+		});
+		const ast = {
+			type: 'Style' as const,
+			attributes: [],
+			children: cssAst.children,
+			content: {
+				styles: css,
+				...this.createLocation(false, { start: 0, end: css.length }),
+			},
+			...this.createLocation(false, { start: 0, end: css.length }),
+		};
+		return ast;
 	}
 }
 
-export function parseVisualSchema(schema: VisualSchema, options: ParserOptions = {}): Ast {
-	const parser = new VisualSchemaParser(schema);
+export function parseVisualSchema(schema: VisualSchema & { tag?: string }, options: ParserOptions = {}): Ast {
+	const { customElement } = options;
+	const customTag = customElement && schema.tag;
+	const parser = new VisualSchemaParser(schema, customTag);
 	return {
-		html: null,
-		css: null,
-		instance: null,
-		module: null,
-	}
+		html: parser.getHtml(),
+		css: parser.getCss(),
+		instance: parser.getInstance(),
+		module: parser.getModule(),
+	};
 }

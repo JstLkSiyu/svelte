@@ -157,7 +157,7 @@ export function compileVisualSchema(schema: VisualSchema, options: CompileOption
 	stats.start('create component');
 	const component = new Component(
 		ast,
-		String(),
+		schema.css?.trim() || String(),
 		options.name || get_name_from_filename(options.filename) || 'Component',
 		options,
 		stats,
