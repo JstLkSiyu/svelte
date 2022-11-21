@@ -11,6 +11,7 @@ import { parseExpressionAt } from 'code-red';
 // @ts-ignore
 import parseCss from 'css-tree/parser';
 import { walk } from 'estree-walker';
+import { isElementNode, isExprNode, isTextNode } from './utils/visualNode';
 
 type ParserState = (parser: Parser) => (ParserState | void);
 
@@ -276,7 +277,7 @@ class VisualSchemaParser {
 		this.getCss = () => this.parseCss(css);
 		this.getInstance = () => this.parseJs(js, 'module');
 	}
-	parseSvelteOptions(attributes: VisualNodeAttr[]) {
+	private parseSvelteOptions(attributes: VisualNodeAttr[]) {
 		const ast = {
 			type: 'Options',
 			name: 'svelte:options',
@@ -286,7 +287,7 @@ class VisualSchemaParser {
 		};
 		return ast;
 	}
-	parseText(raw: string, data?: string) {
+	private parseText(raw: string, data?: string) {
 		const ast = {
 			type: 'Text',
 			raw,
@@ -295,7 +296,7 @@ class VisualSchemaParser {
 		};
 		return ast;
 	}
-	parseAttribute(attribute: VisualNodeAttr) {
+	private parseAttribute(attribute: VisualNodeAttr) {
 		const { type, name, value } = attribute;
 		const ast = {
 			type,
@@ -305,21 +306,18 @@ class VisualSchemaParser {
 		};
 		return ast;
 	}
-	parseNode(node: VisualNodeIntl) {
-		if (this.isElementNode(node)) {
+	private parseNode(node: VisualNodeIntl) {
+		if (isElementNode(node)) {
 			return this.parseElementNode(node.tagName, node.attributes, node.children);
-		} else if (this.isExprNode(node)) {
+		} else if (isExprNode(node)) {
 			return this.parseExpr(node.expression, true);
-		} else if (this.isTextNode(node)) {
+		} else if (isTextNode(node)) {
 			return this.parseText(node.text);
 		} else {
 			return null;
 		}
 	}
-	parseLogicNode() {
-		//
-	}
-	parseEventHandler(event: string, handleExpr: string) {
+	private parseEventHandler(event: string, handleExpr: string) {
 		const ast = {
 			type: 'EventHandler',
 			name: event,
@@ -329,16 +327,7 @@ class VisualSchemaParser {
 		};
 		return ast;
 	}
-	isElementNode(node: VisualNodeIntl): node is VisualElementNode {
-		return node.type === 'element';
-	}
-	isExprNode(node: VisualNodeIntl): node is VisualExprNode {
-		return node.type === 'expr';
-	}
-	isTextNode(node: VisualNodeIntl): node is VisualTextNode {
-		return node.type === 'text';
-	}
-	parseElementNode(tagName: string, attributes: VisualNodeAttr[], children: VisualNodeIntl[]) {
+	private parseElementNode(tagName: string, attributes: VisualNodeAttr[], children: VisualNodeIntl[]) {
 		const ast = {
 			type: 'Element',
 			name: tagName,
@@ -365,7 +354,7 @@ class VisualSchemaParser {
 		};
 		return ast;
 	}
-	createFragment(children: any) {
+	private createFragment(children: any) {
 		const ast = {
 			type: 'Fragment',
 			children,
@@ -373,7 +362,7 @@ class VisualSchemaParser {
 		};
 		return ast;
 	}
-	createLocation(withLocation = false, startAndEnd?: { start: number, end: number }) {
+	private createLocation(withLocation = false, startAndEnd?: { start: number, end: number }) {
 		const { start, end } = startAndEnd ?? { start: 0, end: 0 };
 		const location = { start, end };
 		const emptyLoc = { line:0, column: 0 };
@@ -387,7 +376,7 @@ class VisualSchemaParser {
 		}
 		return location;
 	}
-	parseJs(js: string, context: string) {
+	private parseJs(js: string, context: string) {
 		const ast = {
 			type: 'Script' as const,
 			context,
@@ -399,7 +388,7 @@ class VisualSchemaParser {
 		};
 		return ast;
 	}
-	parseExpr(expr: string, wrapMustache = false) {
+	private parseExpr(expr: string, wrapMustache = false) {
 		const exprBlock = parseExpressionAt(expr, 0, {
 			sourceType: 'module',
 			ecmaVersion: 12,
@@ -414,7 +403,7 @@ class VisualSchemaParser {
 		}
 		return ast;
 	}
-	parseCss(css: string) {
+	private parseCss(css: string) {
 		css = css.trim();
 		let cssAst = parseCss(css, {
 			positions: true,
