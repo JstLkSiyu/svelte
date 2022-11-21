@@ -7,7 +7,7 @@ import { TemplateNode, Ast, ParserOptions, Fragment, Style, Script, VisualSchema
 import error from '../utils/error';
 import parser_errors from './errors';
 import { Program } from 'estree';
-import { parseExpressionAt } from 'code-red';
+import { b, p, parseExpressionAt } from 'code-red';
 // @ts-ignore
 import parseCss from 'css-tree/parser';
 import { walk } from 'estree-walker';
@@ -262,8 +262,8 @@ class VisualSchemaParser {
 			root,
 			css = String(),
 			js = String(),
-			// props = [],
-			// states = [],
+			props = [],
+			states = [],
 		} = schema;
 		const rootAst = this.parseNode(root);
 		const tagOptions = this.parseSvelteOptions([{
@@ -275,7 +275,20 @@ class VisualSchemaParser {
 		const htmlFragment = this.createFragment(htmlContent);
 		this.getHtml = () => htmlFragment;
 		this.getCss = () => this.parseCss(css);
-		this.getInstance = () => this.parseJs(js, 'module');
+		this.getModule = () => this.parseJs(js, 'module');
+		this.getInstance = () => this.parseInstance(props, states);
+	}
+	private parseInstance(props: string[], states: string[]) {
+		const ast = {
+			type: 'Script' as const,
+			context,
+			content: p`
+				${props.map(prop => b`export let ${prop}`)}
+				${states.map(state => b`let ${state}`)}
+			`,
+			...this.createLocation()
+		};
+		return ast;
 	}
 	private parseSvelteOptions(attributes: VisualNodeAttr[]) {
 		const ast = {
