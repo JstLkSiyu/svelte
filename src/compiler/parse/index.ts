@@ -3,11 +3,11 @@ import fragment from './state/fragment';
 import { regex_whitespace } from '../utils/patterns';
 import { reserved } from '../utils/names';
 import full_char_code_at from '../utils/full_char_code_at';
-import { TemplateNode, Ast, ParserOptions, Fragment, Style, Script, VisualSchema, VisualNodeAttr, VisualNodeIntl } from '../interfaces';
+import { TemplateNode, Ast, ParserOptions, Fragment, Style, Script, VisualSchema, VisualNodeAttr, VisualNodeIntl, VisualState, VisualDispatcher } from '../interfaces';
 import error from '../utils/error';
 import parser_errors from './errors';
 import { Program } from 'estree';
-import { b, p, parseExpressionAt } from 'code-red';
+import { b, parseExpressionAt, print } from 'code-red';
 // @ts-ignore
 import parseCss from 'css-tree/parser';
 import { walk } from 'estree-walker';
@@ -264,6 +264,7 @@ class VisualSchemaParser {
 			js = String(),
 			props = [],
 			states = [],
+			dispatchers = [],
 		} = schema;
 		const rootAst = this.parseNode(root);
 		const tagOptions = this.parseSvelteOptions([{
@@ -276,17 +277,43 @@ class VisualSchemaParser {
 		this.getHtml = () => htmlFragment;
 		this.getCss = () => this.parseCss(css);
 		this.getModule = () => this.parseJs(js, 'module');
-		this.getInstance = () => this.parseInstance(props, states);
+		this.getInstance = () => this.parseInstance(props, states, dispatchers);
 	}
-	private parseInstance(props: string[], states: string[]) {
+	private parseProps(name: string, initValue: string) {
+		if (initValue === '') {
+			return b`export let ${name}`;
+		}
+		return b`export let ${name} = ${initValue}`;
+	}
+	private parseStates(name: string, initValue: string) {
+		if (initValue === '') {
+			return b`let ${name}`;
+		}
+		return b`let ${name} = ${initValue}`;
+	}
+	private parseDispatcher(name: string, content: string) {
+		return b`
+			function ${name}() {
+				${content}
+			}
+		`;
+	}
+	private parseInstance(props: VisualState[], states: VisualState[], dispatchers: VisualDispatcher[]) {
+		const body: any = b`
+			${props.map(prop => this.parseProps(prop.name, prop.initValue))}
+			${states.map(state => this.parseStates(state.name, state.initValue))}
+			${dispatchers.map(dispatcher => this.parseDispatcher(dispatcher.name, dispatcher.content))}
+		`;
+		const root = { type: 'Program' as const, body, sourceType: 'module' as const };
+		const { code } = print(root);
 		const ast = {
 			type: 'Script' as const,
-			context,
-			content: p`
-				${props.map(prop => b`export let ${prop}`)}
-				${states.map(state => b`let ${state}`)}
-			`,
-			...this.createLocation()
+			context: 'default',
+			content: acornParse(code, {
+				sourceType: 'module',
+				ecmaVersion: 12,
+			}) as any as Program,
+			...this.createLocation(),
 		};
 		return ast;
 	}

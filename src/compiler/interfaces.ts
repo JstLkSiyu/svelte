@@ -275,10 +275,21 @@ export type VisualNode = (
 	VisualExprNode
 );
 
+export interface VisualState {
+	name: string;
+	initValue: string;
+}
+
+export interface VisualDispatcher {
+	name: string;
+	content: string;
+}
+
 export interface VisualSchema {
 	css?: string;
 	js?: string;
-	props?: string[];
-	states?: string[];
+	props?: VisualState[];
+	states?: VisualState[];
+	dispatchers?: VisualDispatcher[];
 	root?: VisualNode;
 }
